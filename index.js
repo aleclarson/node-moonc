@@ -9,7 +9,7 @@ function moonc(input) {
     proc.stderr.on('data', (data) => {
       let err = data.toString()
       err = err.slice(err.indexOf('Failed'))
-      err = '  ' + err.trim().replace(/\n\s+/g, '\n    ')
+      err = '  ' + err.trim().replace(/\n\s*/g, '\n    ')
       thru.emit('error', new SyntaxError(err))
     })
     proc.once('close', () => thru.end())
