@@ -1,6 +1,6 @@
 {
   "name": "moonc",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "dependencies": {
     "is-stream": "^1.1.0"
   }
