@@ -8,7 +8,11 @@ while true do
   if len then
     local lua, val = moon.to_lua(io.read(len))
     if lua then
-      if val[1] == nil then val = {} end
+      for i = 1, #val do
+        if val[i] == nil then
+          val[i] = 'null'
+        end
+      end
       io.write(lua .. SEP .. '[' .. table.concat(val, ',') .. ']' .. EOF)
     else
       -- Signal an error.
