@@ -2,10 +2,13 @@ const {PassThrough} = require('stream')
 const {spawn} = require('child_process')
 const isReadable = require('is-stream').readable
 
-// Request stream.
+// End of file indicator.
+const EOF = '\n{--}\n'
+
+// Input stream.
 let stdin = null
 
-// Response queue.
+// Output queue.
 let queue = []
 
 function moonc(input) {
@@ -17,10 +20,9 @@ function moonc(input) {
     if (typeof input != 'string') {
       input = await read(input)
     }
-    let len = Buffer.byteLength(input) + 1
-    stdin.write(len + ' ' + input + '\n')
+    queue.push(thru)
+    stdin.write(thru.input = '\n' + Buffer.byteLength(input) + '\n' + input)
   })
-  queue.push(thru)
   return thru
 }
 
@@ -36,40 +38,48 @@ module.exports = moonc;
   let proc = spawn('lua', [__dirname + '/moon.lua'])
   stdin = proc.stdin
 
-  proc.stdout.setEncoding('utf8')
-  proc.stdout.on('data', (data) => {
-    // TODO: Do something with the source map. 
-    let [lua, map] = data.split('\r\n')
-
-    let thru = queue.shift()
-    thru.emit('data', lua)
-    thru.end()
+  // Exposed for debugging.
+  Object.defineProperty(moonc, '_proc', {
+    value: proc,
+    writable: true,
   })
+
+  proc.stdout.setEncoding('utf8')
+  proc.stdout.on('data', (data) => data.split(EOF).forEach(done))
 
   proc.stderr.setEncoding('utf8')
-  proc.stderr.on('data', (err) => {
-    err = err.slice(err.indexOf('Failed'))
-    err = '  ' + err.trim().replace(/\n\s*/g, '\n    ')
+  proc.stderr.on('data', onError)
+
+  proc.once('error', onError)
+  proc.once('exit', () => proc.killed || moon())
+
+  function done(data) {
+    if (!data) return
+
+    // TODO: Do something with the source map.
+    let [lua, val] = data.split('\n{++}\n')
 
     let thru = queue.shift()
-    thru.emit('error', new SyntaxError(err))
-    thru.end()
-  })
-
-  return proc.on('error', (err) => {
-    if (queue.length) {
-      // Emit the error on the first stream.
-      queue.forEach((thru, i) => {
-        if (i == 0) thru.emit('error', err)
-        thru.end()
-      })
-      queue.length = 0
+    if (lua) {
+      thru.emit('data', lua)
     } else {
-      console.error(err)
+      let i = val.indexOf('Failed')
+      if (~i) {
+        val = val.slice(i)
+        val = '  ' + val.trim().replace(/\n\s*/g, '\n    ')
+      }
+      thru.emit('error', new SyntaxError(val))
     }
-    // Restart the process.
-    moon()
-  })
+    thru.end()
+  }
+
+  function onError(err) {
+    console.error(err)
+    setImmediate(() => {
+      proc.kill(), moon()
+      queue.forEach(thru => stdin.write(thru.input))
+    })
+  }
 })()
 
 function read(stream) {
