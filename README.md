@@ -1,4 +1,4 @@
-# moonc v1.1.0
+# moonc v1.1.1
 
 Transpile a [MoonScript](https://github.com/leafo/moonscript) file.
 
