@@ -1,15 +1,17 @@
 const {PassThrough} = require('stream')
 const {spawn} = require('child_process')
 const isReadable = require('is-stream').readable
+const huey = require('huey')
 
-// End of file indicator.
+// Output stream delimiters.
+const ERR = '\n{!!}\n'
 const EOF = '\n{--}\n'
 
 // Input stream.
 let stdin = null
 
-// Output queue.
-let queue = []
+// Pending requests.
+let pending = []
 
 function moonc(input) {
   if (typeof input != 'string' && !isReadable(input)) {
@@ -24,8 +26,8 @@ function moonc(input) {
     if (len == 0) {
       return thru.emit('data', '')
     }
-    queue.push(thru)
-    stdin.write(thru.input = `\n${len}\n${input}`)
+    pending.push(thru)
+    stdin.write(thru.input = len + '\n' + input)
   })
   return thru
 }
@@ -49,20 +51,16 @@ module.exports = moonc;
   })
 
   proc.stdout.setEncoding('utf8')
-  proc.stdout.on('data', (data) => data.split(EOF).forEach(done))
-
-  proc.stderr.setEncoding('utf8')
-  proc.stderr.on('data', onError)
-
-  proc.once('error', onError)
-  proc.once('exit', () => proc.killed || moon())
-
+  proc.stdout.on('data', (data) => {
+    data = data.split(EOF)
+    data.pop() // Pop the empty line caused by trailing EOF.
+    data.forEach(done)
+  })
   function done(data) {
-    if (!data) return
-    let [lua, err] = data.split('\n{++}\n')
+    let [lua, err] = data.split(ERR)
 
-    let thru = queue.shift()
-    if (lua) {
+    let thru = pending.shift()
+    if (err == null) {
       thru.emit('data', lua)
     } else {
       let i = err.indexOf('Failed')
@@ -75,13 +73,27 @@ module.exports = moonc;
     thru.end()
   }
 
-  function onError(err) {
+  proc.stderr.setEncoding('utf8')
+  proc.stderr.on('data', (data) => {
+    console.log(huey.red(data.replace(/(^|\n)/g, '$1stdout: ')))
+  })
+
+  proc.once('error', (err) => {
     console.error(err)
-    setImmediate(() => {
-      proc.kill(), moon()
-      queue.forEach(thru => stdin.write(thru.input))
-    })
-  }
+    if (proc) {
+      proc.kill()
+      proc = null
+
+      moon() // Restart the transpiler.
+
+      // Retry pending requests.
+      setImmediate(() => {
+        pending.forEach(thru => stdin.write(thru.input))
+      })
+    }
+  }).once('exit', (code) => {
+    if (code > 0 && proc) proc = null, moon()
+  })
 })()
 
 function read(stream) {
