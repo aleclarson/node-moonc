@@ -1,6 +1,6 @@
 {
   "name": "moonc",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "dependencies": {
     "huey": "aleclarson/huey#0.1.0",
     "is-stream": "^1.1.0"
