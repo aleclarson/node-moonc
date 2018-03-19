@@ -59,20 +59,18 @@ module.exports = moonc;
 
   function done(data) {
     if (!data) return
-
-    // TODO: Do something with the source map.
-    let [lua, val] = data.split('\n{++}\n')
+    let [lua, err] = data.split('\n{++}\n')
 
     let thru = queue.shift()
     if (lua) {
       thru.emit('data', lua)
     } else {
-      let i = val.indexOf('Failed')
+      let i = err.indexOf('Failed')
       if (~i) {
-        val = val.slice(i)
-        val = '  ' + val.trim().replace(/\n\s*/g, '\n    ')
+        err = err.slice(i)
+        err = '  ' + err.trim().replace(/\n\s*/g, '\n    ')
       }
-      thru.emit('error', new SyntaxError(val))
+      thru.emit('error', new SyntaxError(err))
     }
     thru.end()
   }
