@@ -20,8 +20,12 @@ function moonc(input) {
     if (typeof input != 'string') {
       input = await read(input)
     }
+    let len = Buffer.byteLength(input)
+    if (len == 0) {
+      return thru.emit('data', '')
+    }
     queue.push(thru)
-    stdin.write(thru.input = '\n' + Buffer.byteLength(input) + '\n' + input)
+    stdin.write(thru.input = `\n${len}\n${input}`)
   })
   return thru
 }
