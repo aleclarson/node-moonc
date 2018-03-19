@@ -6,14 +6,10 @@ local EOF = '\n{--}\n'
 while true do
   local len = tonumber(io.read('*l'))
   if len then
-    local lua, val = moon.to_lua(io.read(len))
+    local input = io.read(len)
+    local lua, val = moon.to_lua(input)
     if lua then
-      for i = 1, #val do
-        if val[i] == nil then
-          val[i] = 'null'
-        end
-      end
-      io.write(lua .. SEP .. '[' .. table.concat(val, ',') .. ']' .. EOF)
+      io.write(lua .. EOF)
     else
       -- Signal an error.
       io.write(SEP .. val .. EOF)
