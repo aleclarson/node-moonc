@@ -79,9 +79,9 @@ module.exports = moonc;
 
     let thru = pending.shift()
     if (err) {
-      thru.emit('error', new SyntaxError(err))
+      thru.emit('error', new SyntaxError(res))
     } else {
-      thru.emit('data', lua)
+      thru.emit('data', res)
     }
     thru.end()
     return true
