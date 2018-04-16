@@ -3,10 +3,6 @@ const {spawn} = require('child_process')
 const isReadable = require('is-stream').readable
 const huey = require('huey')
 
-// Output stream delimiters.
-const ERR = '\n{!!}\n'
-const EOF = '\n{--}\n'
-
 // Input stream.
 let stdin = null
 
@@ -50,27 +46,41 @@ module.exports = moonc;
     writable: true,
   })
 
+  // Data that needs parsing.
+  let stdout = ''
+
   proc.stdout.setEncoding('utf8')
   proc.stdout.on('data', (data) => {
-    data = data.split(EOF)
-    data.pop() // Pop the empty line caused by trailing EOF.
-    data.forEach(done)
+    stdout += data
+    while(parse()) continue
   })
-  function done(data) {
-    let [lua, err] = data.split(ERR)
+
+  // Parse the next response.
+  function parse() {
+    let head = /^\d+/.exec(stdout)
+    if (!head) return false
+
+    let idx = 1 + head[0].length
+    let len = Number(head[0])
+
+    // The response is incomplete.
+    if (idx + len > stdout.length) {
+      return false
+    }
+
+    // Parse the result.
+    let res = stdout.slice(idx, idx + len)
+    let err = stdout[idx - 1] == '\u0001' // leading \1 denotes error
+    stdout = stdout.slice(idx + len)
 
     let thru = pending.shift()
-    if (err == null) {
-      thru.emit('data', lua)
-    } else {
-      let i = err.indexOf('Failed')
-      if (~i) {
-        err = err.slice(i)
-        err = '  ' + err.trim().replace(/\n\s*/g, '\n    ')
-      }
+    if (err) {
       thru.emit('error', new SyntaxError(err))
+    } else {
+      thru.emit('data', lua)
     }
     thru.end()
+    return true
   }
 
   proc.stderr.setEncoding('utf8')
