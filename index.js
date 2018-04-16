@@ -23,7 +23,11 @@ function moonc(input) {
       return thru.emit('data', '')
     }
     pending.push(thru)
-    stdin.write(thru.input = len + '\n' + input)
+    try {
+      stdin.write(thru.input = len + '\n' + input)
+    } catch(err) {
+      thru.emit('error', err)
+    }
   })
   return thru
 }
