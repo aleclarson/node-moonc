@@ -89,7 +89,7 @@ module.exports = moonc;
 
   proc.stderr.setEncoding('utf8')
   proc.stderr.on('data', (data) => {
-    console.log(huey.red(data.replace(/(^|\n)/g, '$1stdout: ')))
+    console.log(huey.red(data.replace(/(^|\n)/g, '$1stderr: ')))
   })
 
   proc.once('error', (err) => {
